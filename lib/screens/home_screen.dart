@@ -1,38 +1,126 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hotel_smart_app/providers/notifications_provider.dart';
-import 'package:hotel_smart_app/providers/tasks_provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hotel_smart_app/config/router/app_router.dart';
 import 'package:hotel_smart_app/models/notification_model.dart';
 import 'package:hotel_smart_app/models/task_model.dart';
+import 'package:hotel_smart_app/providers/auth_provider.dart';
+import 'package:hotel_smart_app/providers/notifications_provider.dart';
+import 'package:hotel_smart_app/providers/tasks_provider.dart';
 import 'package:hotel_smart_app/widgets/alerts_panel.dart';
 import 'package:hotel_smart_app/widgets/kanban_column.dart';
+import 'package:hotel_smart_app/widgets/notification_banner.dart';
 
 /// Pantalla principal de la Smart TV — Tablero de Control Kanban.
 ///
 /// Centro de mando visual (Back of House) para que gerentes o coordinadores
 /// monitoreen en tiempo real el estado de las tareas del personal.
 ///
-/// Layout en landscape:
-///   ┌──────────────────────────────────────────────────────┐
-///   │  🔔 Panel de Alertas (colapsable, scrolleable)       │
-///   ├───────────────────────┬──────────────────────────────┤
-///   │      Pendientes       │         En Progreso          │
-///   │      (pending)        │         (inProgress)         │
-///   │                       │                              │
-///   └───────────────────────┴──────────────────────────────┘
-///
-/// Se excluyen tareas completadas del tablero.
-/// Las alertas se limitan a 10, ordenadas por fecha descendente.
-/// Usa Riverpod para suscribirse a Firestore en tiempo real.
-class HomeScreen extends ConsumerWidget {
+/// Además escucha el stream `/alerts` (`isAcknowledged == false`) y, cuando
+/// llega una nueva alerta con prioridad alta/crítica, despliega un banner
+/// overlay superior durante 10 segundos ([H-23]).
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final Set<String> _displayedAlertIds = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(notificationsProvider).whenData(_handleIncomingAlerts);
+    });
+  }
+
+  @override
+  void dispose() {
+    NotificationBanner.dismissCurrent();
+    super.dispose();
+  }
+
+  void _handleIncomingAlerts(List<NotificationModel> alerts) {
+    final activeIds = alerts.map((a) => a.id).toSet();
+    _displayedAlertIds.removeWhere((id) => !activeIds.contains(id));
+
+    final newHighPriorityAlerts = alerts
+        .where(
+          (alert) =>
+              alert.active &&
+              !alert.isAcknowledged &&
+              alert.isHighPriority &&
+              !_displayedAlertIds.contains(alert.id),
+        )
+        .toList();
+
+    if (newHighPriorityAlerts.isEmpty) return;
+
+    for (final alert in newHighPriorityAlerts) {
+      _displayedAlertIds.add(alert.id);
+    }
+
+    final latestAlert = newHighPriorityAlerts.first;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      NotificationBanner.show(context, latestAlert);
+    });
+  }
+
+  Future<void> _refreshTokenClaims() async {
+    try {
+      final updatedHotelId =
+          await ref.read(authServiceProvider).refreshIdTokenClaims();
+      if (!mounted) return;
+      ref.read(hotelIdClaimProvider.notifier).state = updatedHotelId;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updatedHotelId != null && updatedHotelId.isNotEmpty
+                ? 'Token actualizado (Hotel: $updatedHotelId)'
+                : 'Token actualizado sin claim hotelId asignado',
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error refrescando token: $e')),
+      );
+    }
+  }
+
+  Future<void> _signOut() async {
+    NotificationBanner.dismissCurrent();
+    await ref.read(authServiceProvider).signOut();
+    if (!mounted) return;
+    ref.read(authSessionProvider.notifier).state = null;
+    ref.read(hotelIdClaimProvider.notifier).state = null;
+    context.go(AppRoutes.login);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Escuchar nuevas alertas críticas para disparar el overlay de 10s [H-23].
+    ref.listen<AsyncValue<List<NotificationModel>>>(
+      notificationsProvider,
+      (previous, next) {
+        next.whenData(_handleIncomingAlerts);
+      },
+    );
+
     // ── Streams de Firestore via Riverpod ─────────────────────────────────────
     final pendingAsync = ref.watch(pendingTasksStreamProvider);
     final inProgressAsync = ref.watch(inProgressTasksStreamProvider);
     final alertsAsync = ref.watch(notificationsProvider);
+    final hotelId = ref.watch(hotelIdClaimProvider);
+    final session = ref.watch(authSessionProvider);
 
     // ── Extraer datos con manejo de estado ───────────────────────────────────
     final pendingTasks = pendingAsync.valueOrNull ?? <TaskModel>[];
@@ -45,10 +133,12 @@ class HomeScreen extends ConsumerWidget {
     // ── Errores de Firestore en debug ─────────────────────────────────────────
     assert(() {
       if (pendingAsync.hasError) {
-        debugPrint('[HomeScreen] Error en tareas pendientes: ${pendingAsync.error}');
+        debugPrint(
+            '[HomeScreen] Error en tareas pendientes: ${pendingAsync.error}');
       }
       if (inProgressAsync.hasError) {
-        debugPrint('[HomeScreen] Error en tareas en progreso: ${inProgressAsync.error}');
+        debugPrint(
+            '[HomeScreen] Error en tareas en progreso: ${inProgressAsync.error}');
       }
       if (alertsAsync.hasError) {
         debugPrint('[HomeScreen] Error en alertas: ${alertsAsync.error}');
@@ -62,7 +152,10 @@ class HomeScreen extends ConsumerWidget {
         child: Column(
           children: [
             // ── AppBar personalizada ──────────────────────────────────────
-            _buildAppBar(),
+            _buildAppBar(
+              hotelId: hotelId,
+              isAuthenticated: session?.isAuthenticated == true,
+            ),
 
             // ── Panel de Alertas (colapsable) ────────────────────────────
             if (!isLoadingAlerts) AlertsPanel(alerts: alerts),
@@ -111,7 +204,10 @@ class HomeScreen extends ConsumerWidget {
   }
 
   /// AppBar personalizada para el tablero Kanban.
-  Widget _buildAppBar() {
+  Widget _buildAppBar({
+    required String? hotelId,
+    required bool isAuthenticated,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       decoration: BoxDecoration(
@@ -164,6 +260,65 @@ class HomeScreen extends ConsumerWidget {
           ),
 
           const Spacer(),
+
+          if (hotelId != null && hotelId.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3B82F6).withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.35),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.apartment_rounded,
+                    size: 14,
+                    color: Color(0xFF93C5FD),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Hotel: $hotelId',
+                    style: const TextStyle(
+                      color: Color(0xFF93C5FD),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+
+          if (isAuthenticated) ...[
+            Tooltip(
+              message: 'Refrescar claims (getIdToken)',
+              child: IconButton(
+                onPressed: _refreshTokenClaims,
+                icon: Icon(
+                  Icons.sync_lock_rounded,
+                  size: 20,
+                  color: Colors.white.withValues(alpha: 0.65),
+                ),
+              ),
+            ),
+            Tooltip(
+              message: 'Cerrar sesión',
+              child: IconButton(
+                onPressed: _signOut,
+                icon: Icon(
+                  Icons.logout_rounded,
+                  size: 20,
+                  color: Colors.white.withValues(alpha: 0.65),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
 
           // Reloj
           StreamBuilder(

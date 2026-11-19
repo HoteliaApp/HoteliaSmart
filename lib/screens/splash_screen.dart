@@ -1,14 +1,18 @@
+import 'dart:async';
+
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hotel_smart_app/config/router/app_router.dart';
+import 'package:hotel_smart_app/config/services/auth_service.dart';
+import 'package:hotel_smart_app/providers/auth_provider.dart';
 
 /// Pantalla de carga inicial de la Smart TV.
 ///
 /// Muestra el logo animado mientras se completa la inicialización de Flutter
-/// y Firebase. Navega automáticamente a [HomeScreen] tras la animación.
-/// Cada pantalla gestiona su propio estado de carga/error de Firebase
-/// a través de los providers de Riverpod (loading → data → error).
+/// y la verificación de sesión/claims en Firebase Auth (`getIdToken(true)`).
+/// Navega automáticamente a [HomeScreen] o [LoginScreen] tras la animación.
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -22,6 +26,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late final AnimationController _controller;
   late final Animation<double> _fadeAnim;
   late final Animation<double> _scaleAnim;
+  Timer? _splashTimer;
+  Future<AuthSessionResult>? _sessionFuture;
 
   @override
   void initState() {
@@ -38,24 +44,60 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
 
     _controller.forward();
-    _navigateToHome();
+    _startInitialization();
   }
 
   @override
   void dispose() {
+    _splashTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   // ── Lógica de inicialización ──────────────────────────────────────────────
 
-  Future<void> _navigateToHome() async {
-    // Espera a que la animación termine (900 ms) + margen visual (900 ms más).
-    // Navega a Home siempre — Firebase se inicializa en background.
-    // Cada pantalla muestra su propio spinner de carga vía Riverpod AsyncValue.
-    await Future<void>.delayed(const Duration(milliseconds: 1800));
+  void _startInitialization() {
+    if (Firebase.apps.isNotEmpty) {
+      _sessionFuture = _resolveSession();
+    }
+
+    _splashTimer = Timer(
+      const Duration(milliseconds: 1800),
+      _navigateAfterSplash,
+    );
+  }
+
+  Future<AuthSessionResult> _resolveSession() async {
+    try {
+      return await ref
+          .read(authServiceProvider)
+          .ensureAuthenticatedAndRefreshClaims();
+    } catch (e) {
+      debugPrint('[SplashScreen] Error verificando sesión/claims: $e');
+      return const AuthSessionResult.unauthenticated();
+    }
+  }
+
+  Future<void> _navigateAfterSplash() async {
     if (!mounted) return;
-    context.go(AppRoutes.home);
+
+    // Si Firebase aún no fue inicializado (ej. entorno de tests), ir a Home.
+    if (Firebase.apps.isEmpty) {
+      context.go(AppRoutes.home);
+      return;
+    }
+
+    final session =
+        await (_sessionFuture ?? Future.value(const AuthSessionResult.unauthenticated()));
+    if (!mounted) return;
+
+    if (session.isAuthenticated) {
+      ref.read(authSessionProvider.notifier).state = session;
+      ref.read(hotelIdClaimProvider.notifier).state = session.hotelId;
+      context.go(AppRoutes.home);
+    } else {
+      context.go(AppRoutes.login);
+    }
   }
 
   // ── UI ────────────────────────────────────────────────────────────────────

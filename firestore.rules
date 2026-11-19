@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ── Helpers de autenticación y aislamiento multi-hotel ─────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function userHotelId() {
+      return request.auth.token.hotelId;
+    }
+
+    function hasHotelClaim() {
+      return isAuthenticated()
+        && ('hotelId' in request.auth.token)
+        && request.auth.token.hotelId != null
+        && request.auth.token.hotelId != '';
+    }
+
+    function belongsToUserHotel(docData) {
+      return hasHotelClaim()
+        && (!('hotelId' in docData) || docData.hotelId == userHotelId());
+    }
+
+    // ── Alertas críticas / operativas (/alerts) ────────────────────────────
+    match /alerts/{alertId} {
+      allow read: if belongsToUserHotel(resource.data);
+      allow create: if belongsToUserHotel(request.resource.data);
+      allow update: if belongsToUserHotel(resource.data)
+        && belongsToUserHotel(request.resource.data);
+      allow delete: if belongsToUserHotel(resource.data);
+    }
+
+    // ── Tareas del personal (/tasks) ───────────────────────────────────────
+    match /tasks/{taskId} {
+      allow read: if belongsToUserHotel(resource.data);
+      allow create: if belongsToUserHotel(request.resource.data);
+      allow update: if belongsToUserHotel(resource.data)
+        && belongsToUserHotel(request.resource.data);
+      allow delete: if belongsToUserHotel(resource.data);
+    }
+
+    // ── Habitaciones (/rooms) ──────────────────────────────────────────────
+    match /rooms/{roomId} {
+      allow read: if belongsToUserHotel(resource.data);
+      allow create: if belongsToUserHotel(request.resource.data);
+      allow update: if belongsToUserHotel(resource.data)
+        && belongsToUserHotel(request.resource.data);
+      allow delete: if belongsToUserHotel(resource.data);
+    }
+
+    // ── Reservaciones (/reservations) ──────────────────────────────────────
+    match /reservations/{reservationId} {
+      allow read: if belongsToUserHotel(resource.data);
+      allow create: if belongsToUserHotel(request.resource.data);
+      allow update: if belongsToUserHotel(resource.data)
+        && belongsToUserHotel(request.resource.data);
+      allow delete: if belongsToUserHotel(resource.data);
+    }
+
+    // ── Perfiles de usuario (/users) ───────────────────────────────────────
+    match /users/{userId} {
+      allow read: if (isAuthenticated() && request.auth.uid == userId)
+        || belongsToUserHotel(resource.data);
+      allow create: if (isAuthenticated() && request.auth.uid == userId)
+        || belongsToUserHotel(request.resource.data);
+      allow update: if (isAuthenticated() && request.auth.uid == userId)
+        || (belongsToUserHotel(resource.data)
+            && belongsToUserHotel(request.resource.data));
+      allow delete: if belongsToUserHotel(resource.data);
+    }
+
+    // ── Bloqueo por defecto para cualquier otra colección ──────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

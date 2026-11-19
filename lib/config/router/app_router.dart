@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hotel_smart_app/screens/splash_screen.dart';
 import 'package:hotel_smart_app/screens/home_screen.dart';
+import 'package:hotel_smart_app/screens/login_screen.dart';
+import 'package:hotel_smart_app/screens/splash_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes de rutas
@@ -9,12 +10,14 @@ import 'package:hotel_smart_app/screens/home_screen.dart';
 
 /// Centraliza todas las rutas con nombre de la app.
 ///
-/// La Smart TV solo tiene dos pantallas: splash (carga) y home (tablero Kanban).
-/// La vista de habitaciones fue removida para enfocar la pantalla 100% en
-/// el flujo de tareas y alertas del personal.
+/// La Smart TV cuenta con splash (carga y validación de claims), login de
+/// respaldo y home (tablero Kanban con overlay de alertas críticas).
 abstract final class AppRoutes {
   /// Pantalla de carga inicial.
   static const String splash = '/';
+
+  /// Pantalla de inicio de sesión cuando no hay sesión ni auto-login.
+  static const String login = '/login';
 
   /// Tablero Kanban principal — centro de mando de tareas y alertas.
   static const String home = '/home';
@@ -26,13 +29,11 @@ abstract final class AppRoutes {
 
 /// Instancia de [GoRouter] que gestiona la navegación de la Smart TV.
 ///
-/// Flujo simplificado:
+/// Flujo:
 ///   1. La app arranca en [SplashScreen] (ruta `/`).
-///   2. Una vez que Firebase está listo, [SplashScreen] navega a `/home`.
-///   3. [HomeScreen] muestra el tablero Kanban con tareas y alertas.
-///
-/// No se implementa autenticación aquí porque la Smart TV es un dispositivo
-/// de uso interno del hotel (sin login de huésped).
+///   2. Se valida sesión / auto-login y se refresca el JWT (`getIdToken(true)`)
+///      para leer el Custom Claim `hotelId`.
+///   3. Si hay sesión válida navega a `/home`; si no, a `/login`.
 final GoRouter appRouter = GoRouter(
   initialLocation: AppRoutes.splash,
   debugLogDiagnostics: true,
@@ -45,6 +46,13 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.splash,
       name: 'splash',
       builder: (context, state) => const SplashScreen(),
+    ),
+
+    // ── Login ────────────────────────────────────────────────────────────────
+    GoRoute(
+      path: AppRoutes.login,
+      name: 'login',
+      builder: (context, state) => const LoginScreen(),
     ),
 
     // ── Tablero Kanban ───────────────────────────────────────────────────────
