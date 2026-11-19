@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hotel_smart_app/config/services/hotel_service.dart';
 import 'package:hotel_smart_app/models/task_model.dart';
+import 'package:hotel_smart_app/providers/auth_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Providers de tareas
@@ -11,7 +12,10 @@ import 'package:hotel_smart_app/models/task_model.dart';
 /// Se actualiza en tiempo real cuando Hotel-Project crea nuevas tareas.
 final pendingTasksStreamProvider = StreamProvider<List<TaskModel>>((ref) {
   final service = ref.watch(hotelServiceProvider);
-  return service.watchPendingTasks().map(_snapshotToTasks);
+  final hotelId = ref.watch(hotelIdClaimProvider);
+  return service
+      .watchPendingTasks(hotelId: hotelId)
+      .map(_snapshotToTasks);
 });
 
 /// Stream de tareas en progreso (`status == 'inProgress'`) para la columna Kanban.
@@ -19,20 +23,30 @@ final pendingTasksStreamProvider = StreamProvider<List<TaskModel>>((ref) {
 /// Nota: usa 'inProgress' (camelCase) para coincidir con WearTaskStatus.inProgress.name.
 final inProgressTasksStreamProvider = StreamProvider<List<TaskModel>>((ref) {
   final service = ref.watch(hotelServiceProvider);
-  return service.watchInProgressTasks().map(_snapshotToTasks);
+  final hotelId = ref.watch(hotelIdClaimProvider);
+  return service
+      .watchInProgressTasks(hotelId: hotelId)
+      .map(_snapshotToTasks);
 });
 
 /// Stream de tareas activas (pending + inProgress) para el dashboard.
 /// Son las tareas que el wearable está procesando actualmente.
 final activeTasksProvider = StreamProvider<List<TaskModel>>((ref) {
   final service = ref.watch(hotelServiceProvider);
-  return service.watchActiveTasks().map(_snapshotToTasks);
+  final hotelId = ref.watch(hotelIdClaimProvider);
+  return service
+      .watchActiveTasks(hotelId: hotelId)
+      .map(_snapshotToTasks);
 });
 
-/// Helper para convertir QuerySnapshot a `List<TaskModel>`.
+/// Helper para convertir QuerySnapshot a `List<TaskModel>`, ordenado por
+/// fecha de creación descendente.
 List<TaskModel> _snapshotToTasks(
-    QuerySnapshot<Map<String, dynamic>> snapshot) {
-  return snapshot.docs
+  QuerySnapshot<Map<String, dynamic>> snapshot,
+) {
+  final tasks = snapshot.docs
       .map((doc) => TaskModel.fromFirestore(doc.id, doc.data()))
-      .toList();
+      .toList()
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  return tasks;
 }

@@ -3,9 +3,9 @@ import '../models/notification_model.dart';
 
 /// Fuente de datos de notificaciones/alertas para la Smart TV.
 ///
-/// Conecta con la colección `notifications` de Firestore en tiempo real.
-/// Limita a 10 resultados y ordena por fecha descendente para evitar
-/// el desbordamiento visual reportado por el profesor.
+/// Conecta con la colección `/alerts` de Firestore en tiempo real filtrando
+/// `isAcknowledged == false`. Limita a 10 resultados y ordena por fecha
+/// descendente en memoria.
 class NotificationsDatasource {
   final FirebaseFirestore _firestore;
 
@@ -19,20 +19,25 @@ class NotificationsDatasource {
   // Stream en tiempo real (Firestore)
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Stream de alertas activas desde Firestore.
-  /// Limitado a 30 documentos más recientes; filtra `isAcknowledged == false`
-  /// en el cliente para evitar requerir un índice compuesto en Firestore.
-  Stream<List<NotificationModel>> watchActiveNotifications() {
-    return _notifications
-        .orderBy('createdAt', descending: true)
-        .limit(30)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) =>
-                NotificationModel.fromFirestore(doc.id, doc.data()))
-            .where((n) => n.active) // isAcknowledged == false → active == true
-            .take(10)
-            .toList());
-  }
+  /// Stream de alertas activas (`isAcknowledged == false`) desde Firestore.
+  Stream<List<NotificationModel>> watchActiveNotifications({String? hotelId}) {
+    Query<Map<String, dynamic>> query = _notifications.where(
+      'isAcknowledged',
+      isEqualTo: false,
+    );
 
+    if (hotelId != null && hotelId.isNotEmpty) {
+      query = query.where('hotelId', isEqualTo: hotelId);
+    }
+
+    return query.limit(30).snapshots().map((snapshot) {
+      final alerts = snapshot.docs
+          .map((doc) => NotificationModel.fromFirestore(doc.id, doc.data()))
+          .where((n) => n.active && !n.isAcknowledged)
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return alerts.take(10).toList();
+    });
+  }
 }

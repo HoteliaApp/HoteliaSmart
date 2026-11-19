@@ -16,6 +16,7 @@ dependencies:
   # Firebase - misma base de datos que hotel_app y hotel_wear_app
   firebase_core: ^3.13.1
   cloud_firestore: ^5.6.9
+  firebase_auth: ^5.5.1
 
   # State management - alineado con Hotel-Project y hotel_wear_app
   flutter_riverpod: ^2.6.1
