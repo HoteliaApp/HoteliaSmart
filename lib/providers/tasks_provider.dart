@@ -29,6 +29,16 @@ final inProgressTasksStreamProvider = StreamProvider<List<TaskModel>>((ref) {
       .map(_snapshotToTasks);
 });
 
+/// Stream de tareas completadas (`status == 'completed'`) para calcular
+/// el tiempo medio de entrega de habitaciones del día [H-33].
+final completedTasksStreamProvider = StreamProvider<List<TaskModel>>((ref) {
+  final service = ref.watch(hotelServiceProvider);
+  final hotelId = ref.watch(hotelIdClaimProvider);
+  return service
+      .watchCompletedTasks(hotelId: hotelId)
+      .map(_snapshotToTasks);
+});
+
 /// Stream de tareas activas (pending + inProgress) para el dashboard.
 /// Son las tareas que el wearable está procesando actualmente.
 final activeTasksProvider = StreamProvider<List<TaskModel>>((ref) {
