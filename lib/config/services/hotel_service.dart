@@ -4,17 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Servicio principal de datos de la Smart TV.
 ///
 /// Se conecta a la misma instancia de Firebase / Firestore que usa
-/// [hotel_app], por lo que cualquier cambio realizado desde la app móvil
+/// [hotel_app] y [hotel_wear_app], por lo que cualquier cambio realizado
 /// se refleja en tiempo real en la pantalla Smart TV gracias a los
 /// [Stream]s de Firestore.
 ///
 /// Colecciones utilizadas:
-///   • `tasks`  → tareas del personal (Kanban)
-///   • `alerts` → alertas activas (`isAcknowledged == false`)
-///
-/// Nota: La colección `rooms` ya no se consulta desde esta app.
-/// El monitoreo de habitaciones fue removido para enfocar la pantalla
-/// 100% en el flujo de tareas y alertas del personal.
+///   • `rooms`  → estado de habitaciones por piso y ocupación [H-33]
+///   • `tasks`  → tareas del personal (Kanban y tiempo medio de entrega)
+///   • `alerts` → alertas activas (`isAcknowledged == false`) [H-23]
 class HotelService {
   HotelService(this._firestore);
 
@@ -24,6 +21,9 @@ class HotelService {
   // Colecciones
   // ─────────────────────────────────────────────────────────────────────────
 
+  CollectionReference<Map<String, dynamic>> get _rooms =>
+      _firestore.collection('rooms');
+
   CollectionReference<Map<String, dynamic>> get _tasks =>
       _firestore.collection('tasks');
 
@@ -31,7 +31,25 @@ class HotelService {
       _firestore.collection('alerts');
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Tareas — Tablero Kanban
+  // Habitaciones — Mapa de Pisos y Ocupación [H-33]
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Stream en tiempo real de todas las habitaciones del hotel.
+  /// Si [hotelId] está presente en el token JWT, filtra por `hotelId`.
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchRooms({
+    String? hotelId,
+  }) {
+    Query<Map<String, dynamic>> query = _rooms;
+
+    if (hotelId != null && hotelId.isNotEmpty) {
+      query = query.where('hotelId', isEqualTo: hotelId);
+    }
+
+    return query.snapshots();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Tareas — Tablero Kanban y Métricas del Día
   // ─────────────────────────────────────────────────────────────────────────
 
   /// Stream de tareas pendientes (`status == 'pending'`).
@@ -47,6 +65,16 @@ class HotelService {
     String? hotelId,
   }) =>
       _buildTaskQuery(status: 'inProgress', hotelId: hotelId).snapshots();
+
+  /// Stream de tareas completadas (`status == 'completed'`) para calcular
+  /// el tiempo medio de entrega de habitaciones del día [H-33].
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchCompletedTasks({
+    int limit = 50,
+    String? hotelId,
+  }) =>
+      _buildTaskQuery(status: 'completed', hotelId: hotelId)
+          .limit(limit)
+          .snapshots();
 
   /// Stream de las últimas [limit] tareas NO completadas.
   /// Usa 'inProgress' (camelCase) para coincidir con WearTaskStatus.inProgress.name.
