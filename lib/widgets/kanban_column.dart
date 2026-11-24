@@ -1,15 +1,12 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:hotel_smart_app/config/theme/app_theme.dart';
+import 'package:hotel_smart_app/widgets/app_ui.dart';
 import '../models/task_model.dart';
 import 'task_card.dart';
 
 /// Columna del tablero Kanban para la Smart TV.
-///
-/// Cada columna tiene:
-///   - Header con icono, título y badge con contador de items
-///   - Cuerpo scrolleable con tarjetas de tarea (ListView.builder)
-///   - Autoscroll si hay más de 3 tareas
-///   - Diseño adaptado al tema oscuro de la app
 class KanbanColumn extends StatefulWidget {
   final String title;
   final IconData icon;
@@ -74,7 +71,6 @@ class _KanbanColumnState extends State<KanbanColumn> {
         continue;
       }
 
-      // Scroll hacia abajo
       await _scrollController.animateTo(
         maxScroll,
         duration: const Duration(seconds: 8),
@@ -86,7 +82,6 @@ class _KanbanColumnState extends State<KanbanColumn> {
 
       if (!mounted || !_isScrolling) break;
 
-      // Scroll rápido hacia arriba
       await _scrollController.animateTo(
         0,
         duration: const Duration(milliseconds: 800),
@@ -100,24 +95,19 @@ class _KanbanColumnState extends State<KanbanColumn> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF161825),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: widget.color.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
+    return AppCard(
+      accent: widget.color,
+      radius: AppRadius.lg,
+      padding: EdgeInsets.zero,
       child: Column(
         children: [
-          // ── Header ─────────────────────────────────────────────────────
-          _buildHeader(),
-
-          // ── Cuerpo scrolleable ─────────────────────────────────────────
+          _buildHeader(context),
           Expanded(
             child: widget.tasks.isEmpty
-                ? _buildEmptyState()
+                ? const AppEmptyState(
+                    icon: Icons.check_circle_rounded,
+                    title: 'Sin tareas',
+                  )
                 : _buildTaskList(),
           ),
         ],
@@ -125,69 +115,53 @@ class _KanbanColumnState extends State<KanbanColumn> {
     );
   }
 
-  /// Header de la columna con icono, título y badge contador.
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md + 2,
+      ),
       decoration: BoxDecoration(
-        color: widget.color.withValues(alpha: 0.08),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        color: widget.color.withValues(alpha: AppAlpha.tint),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.lg),
+        ),
         border: Border(
           bottom: BorderSide(
-            color: widget.color.withValues(alpha: 0.15),
+            color: widget.color.withValues(alpha: 0.2),
             width: 1,
           ),
         ),
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: widget.color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(widget.icon, size: 20, color: widget.color),
+          AppIconBadge(
+            icon: widget.icon,
+            color: widget.color,
+            size: 36,
+            iconSize: AppIconSize.sm,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.sm + 2),
           Expanded(
             child: Text(
               widget.title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-                letterSpacing: 0.3,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          // Badge contador
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: widget.color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '${widget.tasks.length}',
-              style: TextStyle(
-                color: widget.color,
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-              ),
-            ),
-          ),
+          AppPill(label: '${widget.tasks.length}', color: widget.color),
         ],
       ),
     );
   }
 
-  /// Lista de tareas con scroll vertical.
   Widget _buildTaskList() {
     return ListView.builder(
       controller: _scrollController,
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.md),
       itemCount: widget.tasks.length,
       itemBuilder: (context, index) {
         final task = widget.tasks[index];
@@ -199,31 +173,6 @@ class _KanbanColumnState extends State<KanbanColumn> {
           status: task.status,
         );
       },
-    );
-  }
-
-  /// Estado vacío cuando no hay tareas.
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.check_circle_outline_rounded,
-            size: 40,
-            color: Colors.white.withValues(alpha: 0.15),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Sin tareas',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.3),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

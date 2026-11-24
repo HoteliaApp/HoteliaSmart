@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hotel_smart_app/config/theme/app_theme.dart';
+import 'package:hotel_smart_app/widgets/app_ui.dart';
 
 class ServiceActionButton extends StatelessWidget {
   final IconData icon;
@@ -18,51 +20,40 @@ class ServiceActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = isHighlighted ? Colors.orange : Colors.white;
-    final textColor = isHighlighted ? Colors.white : Colors.black;
-    final iconColor = isHighlighted ? Colors.white : Colors.blueGrey;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
-    return InkWell(
+    return AppCard(
+      accent: isHighlighted ? AppColors.primary : null,
+      tinted: isHighlighted,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12.0),
-      child: Container(
-        padding: const EdgeInsets.all(24.0),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(12.0),
-          border: isHighlighted ? null : Border.all(color: Colors.grey.shade300),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 4.0,
-              offset: Offset(0, 2),
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AppIconBadge(
+            icon: icon,
+            color: isHighlighted ? AppColors.primary : cs.onSurfaceVariant,
+            size: 64,
+            iconSize: AppIconSize.lg,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: isHighlighted ? AppColors.primary : cs.onSurface,
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 48.0, color: iconColor),
-            const SizedBox(height: 16.0),
-            Text(
-              title,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18.0,
-                color: textColor,
-              ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            subtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
             ),
-            const SizedBox(height: 8.0),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 14.0,
-                color: isHighlighted ? Colors.white70 : Colors.grey.shade600,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

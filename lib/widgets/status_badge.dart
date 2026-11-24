@@ -1,72 +1,75 @@
 import 'package:flutter/material.dart';
+import 'package:hotel_smart_app/config/theme/app_theme.dart';
+import 'package:hotel_smart_app/widgets/app_ui.dart';
 
 class StatusBadge extends StatelessWidget {
   final String status;
 
   const StatusBadge({super.key, required this.status});
 
-  Color _getColor() {
+  Color _getColor(BuildContext context) {
+    final s = AppStatusColors.of(context);
     switch (status.toLowerCase()) {
-      // Habitaciones
       case 'limpia':
       case 'available':
       case 'completado':
-        return Colors.green.shade600;
+      case 'completed':
+        return s.success;
       case 'sucia':
       case 'dirty':
-        return Colors.red.shade600;
+      case 'pendiente':
+      case 'pending':
+        return s.warning;
       case 'en limpieza':
       case 'maintenance':
       case 'en proceso':
       case 'inprogress':
-        return Colors.blue.shade600;
-      case 'ocupada':
-      case 'occupied':
-      case 'pendiente':
-      case 'pending':
-        return Colors.orange.shade700;
       case 'reservada':
       case 'reserved':
-        return Colors.purple.shade600;
+        return s.info;
+      case 'ocupada':
+      case 'occupied':
+        return s.danger;
       case 'cancelado':
       case 'cancelled':
-        return Colors.grey.shade600;
+        return s.neutral;
       default:
-        return Colors.grey.shade500;
+        return s.neutral;
     }
   }
 
   String _getLabel() {
     switch (status.toLowerCase()) {
-      case 'available': return 'Limpia';
-      case 'occupied': return 'Ocupada';
-      case 'reserved': return 'Reservada';
-      case 'dirty': return 'Sucia';
-      case 'maintenance': return 'En Limpieza';
-      case 'pending': return 'Pendiente';
-      case 'inprogress': return 'En proceso';
-      case 'completed': return 'Completado';
-      case 'cancelled': return 'Cancelado';
-      default: return status;
+      case 'available':
+        return 'Limpia';
+      case 'occupied':
+        return 'Ocupada';
+      case 'reserved':
+        return 'Reservada';
+      case 'dirty':
+        return 'Sucia';
+      case 'maintenance':
+        return 'En Limpieza';
+      case 'pending':
+        return 'Pendiente';
+      case 'inprogress':
+        return 'En proceso';
+      case 'completed':
+        return 'Completado';
+      case 'cancelled':
+        return 'Cancelado';
+      default:
+        return status;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-      decoration: BoxDecoration(
-        color: _getColor(),
-        borderRadius: BorderRadius.circular(20.0),
-      ),
-      child: Text(
-        _getLabel(),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11.0,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+    return AppPill(
+      label: _getLabel(),
+      color: _getColor(context),
+      outlined: true,
+      dense: true,
     );
   }
 }
