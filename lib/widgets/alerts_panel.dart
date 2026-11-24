@@ -1,17 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:hotel_smart_app/config/theme/app_theme.dart';
+import 'package:hotel_smart_app/widgets/app_ui.dart';
 import '../models/notification_model.dart';
 
 /// Panel de alertas con scroll vertical para la Smart TV.
-///
-/// Reemplaza la notificación flotante que causaba desbordamiento visual
-/// cuando llegaban más de 5 alertas simultáneas.
-///
-/// Características:
-///   - Scroll vertical con [ListView.builder] para manejar N alertas
-///   - Máximo 10 alertas visibles (limitado en la consulta de Firestore)
-///   - Ordenado por fecha de creación descendente
-///   - Banner colapsable en la parte superior del tablero
-///   - Diseño compacto para no robar espacio al Kanban
 class AlertsPanel extends StatefulWidget {
   final List<NotificationModel> alerts;
 
@@ -38,7 +30,6 @@ class _AlertsPanelState extends State<AlertsPanel>
       parent: _animController,
       curve: Curves.easeInOut,
     );
-    // Iniciar expandido
     _animController.value = 1.0;
   }
 
@@ -62,106 +53,81 @@ class _AlertsPanelState extends State<AlertsPanel>
   @override
   Widget build(BuildContext context) {
     if (widget.alerts.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1520),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFFF661A).withValues(alpha: 0.3),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFF661A).withValues(alpha: 0.08),
-            blurRadius: 12,
-            spreadRadius: 0,
-          ),
-        ],
+    return AppCard(
+      accent: AppColors.primary,
+      tinted: true,
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.lg,
+        AppSpacing.xl,
+        0,
       ),
+      padding: EdgeInsets.zero,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Header clickeable ─────────────────────────────────────────
           InkWell(
             onTap: _toggleExpand,
             borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(14),
+              top: Radius.circular(AppRadius.md),
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
               child: Row(
                 children: [
-                  // Icono de alerta con pulso
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF661A).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.notifications_active_rounded,
-                      size: 20,
-                      color: Color(0xFFFF661A),
-                    ),
+                  const AppIconBadge(
+                    icon: Icons.notifications_active_rounded,
+                    color: AppColors.primary,
+                    size: 36,
+                    iconSize: AppIconSize.sm,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: AppSpacing.sm + 2),
                   Text(
                     'Alertas Activas',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  // Badge contador
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF661A).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${widget.alerts.length}',
-                      style: const TextStyle(
-                        color: Color(0xFFFF661A),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                      ),
-                    ),
+                  const SizedBox(width: AppSpacing.sm),
+                  AppPill(
+                    label: '${widget.alerts.length}',
+                    color: AppColors.primary,
+                    dense: true,
                   ),
                   const Spacer(),
-                  // Flecha expandir/colapsar
                   AnimatedRotation(
                     turns: _isExpanded ? 0 : -0.25,
                     duration: const Duration(milliseconds: 300),
                     child: Icon(
                       Icons.keyboard_arrow_down_rounded,
-                      color: Colors.white.withValues(alpha: 0.5),
-                      size: 24,
+                      color: cs.onSurfaceVariant,
+                      size: AppIconSize.md,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-
-          // ── Cuerpo expandible con scroll ──────────────────────────────
           SizeTransition(
             sizeFactor: _expandAnimation,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 160),
               child: ListView.builder(
-                padding:
-                    const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+                padding: const EdgeInsets.only(
+                  left: AppSpacing.lg,
+                  right: AppSpacing.lg,
+                  bottom: AppSpacing.md,
+                ),
                 shrinkWrap: true,
                 itemCount: widget.alerts.length,
                 itemBuilder: (context, index) {
-                  final alert = widget.alerts[index];
-                  return _AlertItem(alert: alert);
+                  return _AlertItem(alert: widget.alerts[index]);
                 },
               ),
             ),
@@ -172,7 +138,6 @@ class _AlertsPanelState extends State<AlertsPanel>
   }
 }
 
-/// Item individual de alerta dentro del panel.
 class _AlertItem extends StatelessWidget {
   final NotificationModel alert;
 
@@ -180,46 +145,47 @@ class _AlertItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final statusColors = AppStatusColors.of(context);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs + 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm + 2,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(10),
+        color: AppColors.cardDark.withValues(alpha: 0.7),
+        borderRadius: AppRadius.mdAll,
       ),
       child: Row(
         children: [
-          // Indicador de urgencia
           Container(
-            width: 6,
-            height: 6,
+            width: 7,
+            height: 7,
             decoration: const BoxDecoration(
-              color: Color(0xFFFF661A),
+              color: AppColors.primary,
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 10),
-
-          // Contenido de la alerta
+          const SizedBox(width: AppSpacing.sm + 2),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   alert.title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w600,
-                    fontSize: 13,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppSpacing.xxs),
                 Text(
                   alert.description,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: 11,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -227,34 +193,19 @@ class _AlertItem extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-
-          // Habitación
+          const SizedBox(width: AppSpacing.sm),
           if (alert.relatedRoom.isNotEmpty) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                alert.relatedRoom,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+            AppPill(
+              label: alert.relatedRoom,
+              color: statusColors.neutral,
+              dense: true,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
           ],
-
-          // Tiempo
           Text(
             alert.timeAgo,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.35),
-              fontSize: 10,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
             ),
           ),
         ],

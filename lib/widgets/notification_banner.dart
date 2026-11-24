@@ -1,11 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:hotel_smart_app/config/theme/app_theme.dart';
+import 'package:hotel_smart_app/widgets/app_ui.dart';
 import '../models/notification_model.dart';
 
 /// Banner overlay temporal para alertas críticas ambientales [H-23].
-///
-/// Se despliega en la parte superior de la Smart TV durante 10 segundos
-/// mostrando de forma destacada el número de cuarto y el motivo del aviso.
 class NotificationBanner extends StatelessWidget {
   final NotificationModel notification;
   final Animation<double>? progressAnimation;
@@ -21,7 +21,6 @@ class NotificationBanner extends StatelessWidget {
     this.onClose,
   });
 
-  /// Cierra inmediatamente el banner overlay activo, si existe.
   static void dismissCurrent() {
     final entry = _currentEntry;
     _currentEntry = null;
@@ -30,8 +29,6 @@ class NotificationBanner extends StatelessWidget {
     }
   }
 
-  /// Despliega un banner temporal en la parte superior de la pantalla
-  /// durante [duration] (10 segundos por defecto).
   static void show(
     BuildContext context,
     NotificationModel notification, {
@@ -64,101 +61,90 @@ class NotificationBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final statusColors = AppStatusColors.of(context);
+    final danger = statusColors.danger;
     final showDescription = notification.description.trim().isNotEmpty &&
         notification.description.trim() != notification.title.trim();
+    final bg = Color.alphaBlend(
+      danger.withValues(alpha: 0.16),
+      AppColors.surfaceDark,
+    );
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF2B0F14),
-            Color(0xFF1D0D14),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16.0),
+        color: bg,
+        borderRadius: AppRadius.mdAll,
         border: Border.all(
-          color: const Color(0xFFEF4444).withValues(alpha: 0.85),
+          color: danger.withValues(alpha: 0.85),
           width: 1.8,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFEF4444).withValues(alpha: 0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 16,
+            color: danger.withValues(alpha: 0.25),
+            blurRadius: 20,
             offset: const Offset(0, 6),
           ),
+          ...AppShadows.soft,
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14.0),
+        borderRadius: AppRadius.mdAll,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 16, 14),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg + 4,
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.md + 2,
+              ),
               child: Row(
                 children: [
-                  // ── Icono de Alerta Crítica ──────────────────────────────
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFEF4444).withValues(alpha: 0.45),
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.warning_amber_rounded,
-                      color: Color(0xFFFCA5A5),
-                      size: 30.0,
-                    ),
+                  AppIconBadge(
+                    icon: Icons.warning_amber_rounded,
+                    color: danger,
+                    size: 52,
+                    iconSize: AppIconSize.lg,
                   ),
-                  const SizedBox(width: 16.0),
-
-                  // ── Número de Cuarto destacado ───────────────────────────
+                  const SizedBox(width: AppSpacing.lg),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
+                      horizontal: AppSpacing.md + 2,
+                      vertical: AppSpacing.sm + 2,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444),
-                      borderRadius: BorderRadius.circular(12),
+                      color: danger,
+                      borderRadius: AppRadius.mdAll,
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           'CUARTO',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.black.withValues(alpha: 0.8),
+                            fontWeight: FontWeight.bold,
                             letterSpacing: 1.0,
                           ),
                         ),
                         Text(
                           notification.roomLabel,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 18.0),
-
-                  // ── Motivo del aviso ─────────────────────────────────────
+                  const SizedBox(width: AppSpacing.lg),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,60 +152,37 @@ class NotificationBanner extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFF661A)
-                                    .withValues(alpha: 0.25),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: const Color(0xFFFF661A)
-                                      .withValues(alpha: 0.6),
-                                ),
-                              ),
-                              child: const Text(
-                                'ALERTA CRÍTICA · PRIORIDAD ALTA',
-                                style: TextStyle(
-                                  color: Color(0xFFFDBA74),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
+                            const AppPill(
+                              label: 'ALERTA CRÍTICA · PRIORIDAD ALTA',
+                              color: AppColors.primary,
+                              outlined: true,
+                              dense: true,
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: AppSpacing.sm + 2),
                             Text(
                               notification.timeAgo,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: cs.onSurfaceVariant,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: AppSpacing.xs + 2),
                         Text(
                           notification.title,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            fontSize: 18.0,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: cs.onSurface,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         if (showDescription) ...[
-                          const SizedBox(height: 3.0),
+                          const SizedBox(height: AppSpacing.xxs + 1),
                           Text(
                             notification.description,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.85),
-                              fontSize: 14.0,
-                              fontWeight: FontWeight.w500,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: cs.onSurface.withValues(alpha: 0.88),
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -228,23 +191,20 @@ class NotificationBanner extends StatelessWidget {
                       ],
                     ),
                   ),
-
                   if (onClose != null) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.sm),
                     IconButton(
                       onPressed: onClose,
                       tooltip: 'Cerrar alerta',
                       icon: Icon(
                         Icons.close_rounded,
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ],
               ),
             ),
-
-            // ── Barra de progreso temporal (10s) ───────────────────────────
             if (progressAnimation != null)
               AnimatedBuilder(
                 animation: progressAnimation!,
@@ -252,10 +212,8 @@ class NotificationBanner extends StatelessWidget {
                   return LinearProgressIndicator(
                     value: (1.0 - progressAnimation!.value).clamp(0.0, 1.0),
                     minHeight: 4,
-                    backgroundColor: Colors.white.withValues(alpha: 0.08),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFFEF4444),
-                    ),
+                    backgroundColor: cs.onSurface.withValues(alpha: 0.08),
+                    valueColor: AlwaysStoppedAnimation<Color>(danger),
                   );
                 },
               ),
@@ -266,7 +224,6 @@ class NotificationBanner extends StatelessWidget {
   }
 }
 
-/// Widget interno para manejar la animación y tiempo de vida del banner overlay.
 class _FloatingNotification extends StatefulWidget {
   final NotificationModel notification;
   final Duration duration;
@@ -357,7 +314,7 @@ class _FloatingNotificationState extends State<_FloatingNotification>
               child: Material(
                 color: Colors.transparent,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 12.0),
+                  padding: const EdgeInsets.only(top: AppSpacing.md),
                   child: NotificationBanner(
                     notification: widget.notification,
                     progressAnimation: _progressController,

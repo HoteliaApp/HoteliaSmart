@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:hotel_smart_app/config/theme/app_theme.dart';
 import 'package:hotel_smart_app/providers/rooms_provider.dart';
+import 'package:hotel_smart_app/widgets/app_ui.dart';
 
 /// Panel de Estadísticas y Métricas Generales del Día en pantalla completa [H-33].
-///
-/// Muestra el porcentaje de ocupación, el tiempo medio de entrega de
-/// habitaciones y el resumen en tiempo real de limpieza y tareas operativas.
 class DailyMetricsView extends StatelessWidget {
   final DailyKpiMetrics metrics;
 
@@ -15,78 +14,83 @@ class DailyMetricsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final statusColors = AppStatusColors.of(context);
     final stats = metrics.roomStats;
-    final occupancyProgress = (metrics.occupancyPercentage / 100.0).clamp(0.0, 1.0);
-    final deliveryStatus = _deliveryStatusBadge(metrics.averageDeliveryMinutes);
+    final occupancyProgress =
+        (metrics.occupancyPercentage / 100.0).clamp(0.0, 1.0);
+    final deliveryStatus = _deliveryStatusBadge(
+      metrics.averageDeliveryMinutes,
+      statusColors,
+    );
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.lg,
+        AppSpacing.xl,
+        AppSpacing.xl,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Encabezado ───────────────────────────────────────────────────
-          const Row(
+          Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.analytics_rounded,
-                color: Color(0xFF3B82F6),
-                size: 22,
+                color: AppColors.primary,
+                size: AppIconSize.md,
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.sm + 2),
               Text(
                 'Estadísticas del Día',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(width: 12),
-              Text(
-                'Monitoreo General de Limpieza y Ocupación',
-                style: TextStyle(
-                  color: Color(0xFF9EA3B2),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
+              const SizedBox(width: AppSpacing.md),
+              Flexible(
+                child: Text(
+                  'Monitoreo General de Limpieza y Ocupación',
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg + 2),
 
-          // ── KPIs Principales: Ocupación y Tiempo Medio de Entrega ────────
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tarjeta 1: Porcentaje de Ocupación
               Expanded(
                 child: _HeroKpiCard(
-                  accentColor: const Color(0xFFFF661A),
+                  accentColor: AppColors.primary,
                   title: 'Porcentaje de Ocupación',
                   subtitle:
                       '${stats.occupied} de ${stats.total} habitaciones ocupadas',
                   trailing: SizedBox(
-                    width: 108,
-                    height: 108,
+                    width: 112,
+                    height: 112,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
                         CircularProgressIndicator(
                           value: occupancyProgress,
                           strokeWidth: 10,
-                          backgroundColor: Colors.white.withValues(alpha: 0.08),
+                          backgroundColor: cs.onSurface.withValues(alpha: 0.08),
                           valueColor: const AlwaysStoppedAnimation<Color>(
-                            Color(0xFFFF661A),
+                            AppColors.primary,
                           ),
                         ),
                         Center(
                           child: Text(
                             metrics.occupancyLabel,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
@@ -94,64 +98,55 @@ class DailyMetricsView extends StatelessWidget {
                     ),
                   ),
                   footer: Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
+                    spacing: AppSpacing.md,
+                    runSpacing: AppSpacing.sm,
                     children: [
-                      _MiniStatChip(
-                        label: 'Disponibles',
-                        value: '${stats.available}',
-                        color: const Color(0xFF4CAF50),
+                      AppPill(
+                        label: 'Disponibles: ${stats.available}',
+                        color: statusColors.success,
+                        dense: true,
                       ),
-                      _MiniStatChip(
-                        label: 'Reservadas',
-                        value: '${stats.reserved}',
-                        color: const Color(0xFF2196F3),
+                      AppPill(
+                        label: 'Reservadas: ${stats.reserved}',
+                        color: statusColors.info,
+                        dense: true,
                       ),
-                      _MiniStatChip(
-                        label: 'Por atender',
-                        value: '${stats.needsAttention}',
-                        color: const Color(0xFFF44336),
+                      AppPill(
+                        label: 'Por atender: ${stats.needsAttention}',
+                        color: statusColors.danger,
+                        dense: true,
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(width: 18),
-
-              // Tarjeta 2: Tiempo Medio de Entrega de Habitaciones
+              const SizedBox(width: AppSpacing.lg + 2),
               Expanded(
                 child: _HeroKpiCard(
-                  accentColor: const Color(0xFF3B82F6),
+                  accentColor: statusColors.info,
                   title: 'Tiempo Medio de Entrega',
                   subtitle:
                       '${metrics.completedTodayCount} habitaciones entregadas hoy',
-                  trailing: Container(
+                  trailing: AppCard(
+                    accent: statusColors.info,
+                    tinted: true,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF3B82F6).withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: const Color(0xFF3B82F6).withValues(alpha: 0.4),
-                      ),
+                      horizontal: AppSpacing.lg + 4,
+                      vertical: AppSpacing.lg,
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
-                          Icons.timer_outlined,
-                          color: Color(0xFF93C5FD),
-                          size: 26,
+                        Icon(
+                          Icons.timer_rounded,
+                          color: statusColors.info,
+                          size: AppIconSize.md,
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: AppSpacing.xs + 2),
                         Text(
                           metrics.averageDeliveryLabel,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
@@ -159,34 +154,18 @@ class DailyMetricsView extends StatelessWidget {
                   ),
                   footer: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: deliveryStatus.color.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: deliveryStatus.color.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: Text(
-                          deliveryStatus.label,
-                          style: TextStyle(
-                            color: deliveryStatus.color,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                      AppPill(
+                        label: deliveryStatus.label,
+                        color: deliveryStatus.color,
+                        outlined: true,
+                        dense: true,
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Text(
                           'Meta operativa: ≤ 30 min por habitación',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.55),
-                            fontSize: 12,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.onSurfaceVariant,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -198,9 +177,8 @@ class DailyMetricsView extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.lg + 4),
 
-          // ── Resumen Operativo de Limpieza y Tareas ───────────────────────
           Row(
             children: [
               Expanded(
@@ -208,43 +186,43 @@ class DailyMetricsView extends StatelessWidget {
                   icon: Icons.cleaning_services_rounded,
                   label: 'Habitaciones Sucias',
                   value: '${stats.dirty}',
-                  color: const Color(0xFFF44336),
+                  color: statusColors.warning,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: AppSpacing.md + 2),
               Expanded(
                 child: _SecondaryMetricTile(
-                  icon: Icons.build_circle_outlined,
+                  icon: Icons.build_circle_rounded,
                   label: 'En Limpieza',
                   value: '${stats.maintenance}',
-                  color: const Color(0xFF9C27B0),
+                  color: statusColors.purple,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: AppSpacing.md + 2),
               Expanded(
                 child: _SecondaryMetricTile(
-                  icon: Icons.check_circle_outline_rounded,
+                  icon: Icons.check_circle_rounded,
                   label: 'Listas / Limpias',
                   value: '${stats.available}',
-                  color: const Color(0xFF4CAF50),
+                  color: statusColors.success,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: AppSpacing.md + 2),
               Expanded(
                 child: _SecondaryMetricTile(
                   icon: Icons.pending_actions_rounded,
                   label: 'Tareas Pendientes',
                   value: '${metrics.pendingTasksCount}',
-                  color: const Color(0xFFFF661A),
+                  color: AppColors.primary,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: AppSpacing.md + 2),
               Expanded(
                 child: _SecondaryMetricTile(
                   icon: Icons.trending_up_rounded,
                   label: 'En Progreso',
                   value: '${metrics.inProgressTasksCount}',
-                  color: const Color(0xFF3B82F6),
+                  color: statusColors.info,
                 ),
               ),
             ],
@@ -254,14 +232,17 @@ class DailyMetricsView extends StatelessWidget {
     );
   }
 
-  ({String label, Color color}) _deliveryStatusBadge(double? avgMinutes) {
+  ({String label, Color color}) _deliveryStatusBadge(
+    double? avgMinutes,
+    AppStatusColors statusColors,
+  ) {
     if (avgMinutes == null) {
-      return (label: 'Sin entregas registradas hoy', color: const Color(0xFF9EA3B2));
+      return (label: 'Sin entregas registradas hoy', color: statusColors.neutral);
     }
     if (avgMinutes <= 30.0) {
-      return (label: 'Rendimiento óptimo', color: const Color(0xFF4CAF50));
+      return (label: 'Rendimiento óptimo', color: statusColors.success);
     }
-    return (label: 'Tiempo por encima de meta', color: const Color(0xFFFF9800));
+    return (label: 'Tiempo por encima de meta', color: statusColors.warning);
   }
 }
 
@@ -282,23 +263,12 @@ class _HeroKpiCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161825),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: accentColor.withValues(alpha: 0.3),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: accentColor.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return AppCard(
+      accent: accentColor,
+      radius: AppRadius.lg,
+      padding: const EdgeInsets.all(AppSpacing.xl - 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -310,63 +280,29 @@ class _HeroKpiCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.xs + 2),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: 13,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: AppSpacing.lg),
               trailing,
             ],
           ),
-          const SizedBox(height: 18),
-          Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg + 2),
+          const Divider(height: 1),
+          const SizedBox(height: AppSpacing.md + 2),
           footer,
         ],
-      ),
-    );
-  }
-}
-
-class _MiniStatChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _MiniStatChip({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        '$label: $value',
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
       ),
     );
   }
@@ -387,40 +323,33 @@ class _SecondaryMetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161825),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
+    final theme = Theme.of(context);
+    return AppCard(
+      accent: color,
+      tinted: true,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
+          AppIconBadge(
+            icon: icon,
+            color: color,
+            size: 40,
+            iconSize: AppIconSize.sm,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

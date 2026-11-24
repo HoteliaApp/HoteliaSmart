@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hotel_smart_app/config/router/app_router.dart';
+import 'package:hotel_smart_app/config/theme/app_theme.dart';
 import 'package:hotel_smart_app/models/notification_model.dart';
 import 'package:hotel_smart_app/models/room_model.dart';
 import 'package:hotel_smart_app/models/task_model.dart';
@@ -13,6 +14,7 @@ import 'package:hotel_smart_app/providers/notifications_provider.dart';
 import 'package:hotel_smart_app/providers/rooms_provider.dart';
 import 'package:hotel_smart_app/providers/tasks_provider.dart';
 import 'package:hotel_smart_app/widgets/alerts_panel.dart';
+import 'package:hotel_smart_app/widgets/app_ui.dart';
 import 'package:hotel_smart_app/widgets/daily_metrics_view.dart';
 import 'package:hotel_smart_app/widgets/floor_map_view.dart';
 import 'package:hotel_smart_app/widgets/kanban_column.dart';
@@ -26,15 +28,6 @@ enum DashboardView {
 }
 
 /// Pantalla principal de la Smart TV — Monitoreo General y Centro de Mando.
-///
-/// En modo quiosco/ambiental ([H-33]), alterna automáticamente cada 60 segundos
-/// sin interacción de control remoto entre:
-///   1. Mapa de Pisos ([FloorMapView])
-///   2. Panel de Estadísticas del Día ([DailyMetricsView])
-///
-/// También mantiene accesible el Tablero Kanban de tareas del personal, el
-/// panel colapsable de alertas y el overlay superior de 10 segundos para
-/// alertas críticas ([H-23]).
 class HomeScreen extends ConsumerStatefulWidget {
   static const Duration defaultRotationInterval = Duration(seconds: 60);
 
@@ -81,8 +74,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     NotificationBanner.dismissCurrent();
     super.dispose();
   }
-
-  // ── Modo Quiosco / Rotación Automática [H-33] ─────────────────────────────
 
   void _resetKioskTimer() {
     _kioskTimer?.cancel();
@@ -134,8 +125,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _resetKioskTimer();
   }
 
-  // ── Overlay de Alertas Críticas [H-23] ────────────────────────────────────
-
   void _handleIncomingAlerts(List<NotificationModel> alerts) {
     final activeIds = alerts.map((a) => a.id).toSet();
     _displayedAlertIds.removeWhere((id) => !activeIds.contains(id));
@@ -162,8 +151,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       NotificationBanner.show(context, latestAlert);
     });
   }
-
-  // ── Sesión y Custom Claims ────────────────────────────────────────────────
 
   Future<void> _refreshTokenClaims() async {
     _onUserInteraction();
@@ -203,7 +190,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Escuchar nuevas alertas críticas para disparar el overlay de 10s [H-23].
     ref.listen<AsyncValue<List<NotificationModel>>>(
       notificationsProvider,
       (previous, next) {
@@ -211,7 +197,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
     );
 
-    // ── Streams de Firestore via Riverpod ─────────────────────────────────────
     final roomsAsync = ref.watch(roomsStreamProvider);
     final pendingAsync = ref.watch(pendingTasksStreamProvider);
     final inProgressAsync = ref.watch(inProgressTasksStreamProvider);
@@ -220,7 +205,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final hotelId = ref.watch(hotelIdClaimProvider);
     final session = ref.watch(authSessionProvider);
 
-    // ── Extraer datos con manejo de estado ───────────────────────────────────
     final rooms = roomsAsync.valueOrNull ?? const <RoomModel>[];
     final pendingTasks = pendingAsync.valueOrNull ?? const <TaskModel>[];
     final inProgressTasks = inProgressAsync.valueOrNull ?? const <TaskModel>[];
@@ -228,25 +212,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final isLoadingTasks = pendingAsync.isLoading || inProgressAsync.isLoading;
     final isLoadingAlerts = alertsAsync.isLoading;
-
-    // ── Errores de Firestore en debug ─────────────────────────────────────────
-    assert(() {
-      if (roomsAsync.hasError) {
-        debugPrint('[HomeScreen] Error en habitaciones: ${roomsAsync.error}');
-      }
-      if (pendingAsync.hasError) {
-        debugPrint(
-            '[HomeScreen] Error en tareas pendientes: ${pendingAsync.error}');
-      }
-      if (inProgressAsync.hasError) {
-        debugPrint(
-            '[HomeScreen] Error en tareas en progreso: ${inProgressAsync.error}');
-      }
-      if (alertsAsync.hasError) {
-        debugPrint('[HomeScreen] Error en alertas: ${alertsAsync.error}');
-      }
-      return true;
-    }());
 
     return KeyboardListener(
       focusNode: _remoteFocusNode,
@@ -256,20 +221,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         behavior: HitTestBehavior.translucent,
         onPointerDown: (_) => _onUserInteraction(),
         child: Scaffold(
-          backgroundColor: const Color(0xFF0F1117),
           body: SafeArea(
             child: Column(
               children: [
-                // ── AppBar personalizada con selector de vista y modo quiosco ─
                 _buildAppBar(
+                  context: context,
                   hotelId: hotelId,
                   isAuthenticated: session?.isAuthenticated == true,
                 ),
-
-                // ── Panel de Alertas (colapsable) ────────────────────────────
                 if (!isLoadingAlerts) AlertsPanel(alerts: alerts),
-
-                // ── Contenido principal con transición suave [H-33] ──────────
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 600),
@@ -317,6 +277,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required List<TaskModel> pendingTasks,
     required List<TaskModel> inProgressTasks,
   }) {
+    final statusColors = AppStatusColors.of(context);
     switch (_currentView) {
       case DashboardView.floorMap:
         return FloorMapView(
@@ -329,27 +290,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case DashboardView.kanban:
         if (isLoadingTasks) {
           return const Center(
-            child: CircularProgressIndicator(color: Color(0xFFFF661A)),
+            child: CircularProgressIndicator(color: AppColors.primary),
           );
         }
         return Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(AppSpacing.lg + 4),
           child: Row(
             children: [
               Expanded(
                 child: KanbanColumn(
                   title: 'Tareas Pendientes',
                   icon: Icons.pending_actions_rounded,
-                  color: const Color(0xFFFF661A),
+                  color: AppColors.primary,
                   tasks: pendingTasks,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: AppSpacing.lg),
               Expanded(
                 child: KanbanColumn(
                   title: 'En Progreso',
                   icon: Icons.trending_up_rounded,
-                  color: const Color(0xFF3B82F6),
+                  color: statusColors.info,
                   tasks: inProgressTasks,
                 ),
               ),
@@ -359,40 +320,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  /// AppBar personalizada para el centro de mando y rotación quiosco.
   Widget _buildAppBar({
+    required BuildContext context,
     required String? hotelId,
     required bool isAuthenticated,
   }) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final statusColors = AppStatusColors.of(context);
+    final kioskColor =
+        _isKioskMode ? statusColors.success : statusColors.neutral;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.md,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1117),
+        color: AppColors.surfaceDark,
         border: Border(
-          bottom: BorderSide(
-            color: Colors.white.withValues(alpha: 0.06),
-            width: 1,
-          ),
+          bottom: BorderSide(color: theme.dividerColor, width: 1),
         ),
       ),
       child: Row(
         children: [
-          // Logo
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF661A).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.hotel_rounded,
-              size: 24,
-              color: Color(0xFFFF661A),
-            ),
+          const AppIconBadge(
+            icon: Icons.hotel_rounded,
+            color: AppColors.primary,
+            size: 42,
+            iconSize: AppIconSize.md,
           ),
-          const SizedBox(width: 14),
-          // Título
-          const Flexible(
+          const SizedBox(width: AppSpacing.md + 2),
+          Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -400,133 +359,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Text(
                   'Centro de Mando',
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.4,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: cs.onSurface,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
                   'Monitoreo — Limpieza y Ocupación',
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Color(0xFF6B7280),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w400,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
           ),
-
-          const SizedBox(width: 16),
-
-          // Selector de vistas
+          const SizedBox(width: AppSpacing.lg),
           _ViewChip(
             label: 'Pisos',
             icon: Icons.layers_rounded,
             selected: _currentView == DashboardView.floorMap,
             onTap: () => _selectView(DashboardView.floorMap),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.xs + 2),
           _ViewChip(
             label: 'Métricas',
             icon: Icons.analytics_rounded,
             selected: _currentView == DashboardView.dailyMetrics,
             onTap: () => _selectView(DashboardView.dailyMetrics),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.xs + 2),
           _ViewChip(
             label: 'Kanban',
             icon: Icons.view_kanban_rounded,
             selected: _currentView == DashboardView.kanban,
             onTap: () => _selectView(DashboardView.kanban),
           ),
-
           const Spacer(),
-
-          // Indicador / Toggle Modo Quiosco (60s)
           InkWell(
             onTap: _toggleKioskMode,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: (_isKioskMode
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFF6B7280))
-                    .withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: (_isKioskMode
-                          ? const Color(0xFF10B981)
-                          : const Color(0xFF6B7280))
-                      .withValues(alpha: 0.4),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _isKioskMode
-                        ? Icons.autorenew_rounded
-                        : Icons.pause_circle_outline_rounded,
-                    size: 14,
-                    color: _isKioskMode
-                        ? const Color(0xFF34D399)
-                        : const Color(0xFF9CA3AF),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _isKioskMode ? 'Quiosco 60s' : 'Quiosco Pausado',
-                    style: TextStyle(
-                      color: _isKioskMode
-                          ? const Color(0xFF34D399)
-                          : const Color(0xFF9CA3AF),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
+            borderRadius: AppRadius.mdAll,
+            child: AppPill(
+              label: _isKioskMode ? 'Quiosco 60s' : 'Quiosco Pausado',
+              color: kioskColor,
+              icon: _isKioskMode
+                  ? Icons.autorenew_rounded
+                  : Icons.pause_circle_rounded,
+              outlined: true,
+              dense: true,
             ),
           ),
-          const SizedBox(width: 10),
-
+          const SizedBox(width: AppSpacing.sm + 2),
           if (hotelId != null && hotelId.isNotEmpty) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFF3B82F6).withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: const Color(0xFF3B82F6).withValues(alpha: 0.35),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.apartment_rounded,
-                    size: 14,
-                    color: Color(0xFF93C5FD),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Hotel: $hotelId',
-                    style: const TextStyle(
-                      color: Color(0xFF93C5FD),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+            AppPill(
+              label: 'Hotel: $hotelId',
+              color: statusColors.info,
+              icon: Icons.apartment_rounded,
+              outlined: true,
+              dense: true,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.sm + 2),
           ],
-
           if (isAuthenticated) ...[
             Tooltip(
               message: 'Refrescar claims (getIdToken)',
@@ -534,8 +427,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onPressed: _refreshTokenClaims,
                 icon: Icon(
                   Icons.sync_lock_rounded,
-                  size: 20,
-                  color: Colors.white.withValues(alpha: 0.65),
+                  size: AppIconSize.sm,
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ),
@@ -545,26 +438,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onPressed: _signOut,
                 icon: Icon(
                   Icons.logout_rounded,
-                  size: 20,
-                  color: Colors.white.withValues(alpha: 0.65),
+                  size: AppIconSize.sm,
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
           ],
-
-          // Reloj
           StreamBuilder(
             stream: Stream.periodic(const Duration(seconds: 30)),
             builder: (context, _) {
               final now = DateTime.now();
               return Text(
                 '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 22,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: cs.onSurfaceVariant,
                   fontWeight: FontWeight.w300,
-                  letterSpacing: 2,
+                  letterSpacing: 1.8,
                 ),
               );
             },
@@ -590,21 +480,25 @@ class _ViewChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = const Color(0xFFFF661A);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: AppRadius.mdAll,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs + 2,
+        ),
         decoration: BoxDecoration(
           color: selected
-              ? activeColor.withValues(alpha: 0.18)
-              : Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(10),
+              ? AppColors.primary.withValues(alpha: 0.18)
+              : cs.surfaceContainerHighest.withValues(alpha: 0.4),
+          borderRadius: AppRadius.mdAll,
           border: Border.all(
             color: selected
-                ? activeColor.withValues(alpha: 0.6)
-                : Colors.white.withValues(alpha: 0.08),
+                ? AppColors.primary.withValues(alpha: 0.65)
+                : theme.dividerColor,
           ),
         ),
         child: Row(
@@ -612,18 +506,15 @@ class _ViewChip extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 15,
-              color: selected ? activeColor : Colors.white.withValues(alpha: 0.6),
+              size: AppIconSize.xs,
+              color: selected ? AppColors.primary : cs.onSurfaceVariant,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: AppSpacing.xs + 2),
             Text(
               label,
-              style: TextStyle(
-                color: selected
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.65),
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: selected ? cs.onSurface : cs.onSurfaceVariant,
+                fontWeight: selected ? FontWeight.bold : FontWeight.w500,
               ),
             ),
           ],

@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:hotel_smart_app/config/theme/app_theme.dart';
+import 'package:hotel_smart_app/widgets/app_ui.dart';
 
 /// Tarjeta visual para cada tarea dentro del tablero Kanban.
-///
-/// Muestra el tipo de servicio, persona asignada, habitación y tiempo.
-/// Los colores se diferencian por tipo de servicio:
-///   - Limpieza → azul
-///   - Mantenimiento → naranja
-///   - Room Service → verde
-///   - Otros → gris
 class TaskCard extends StatelessWidget {
   final String serviceType;
   final String assignedTo;
@@ -24,7 +19,6 @@ class TaskCard extends StatelessWidget {
     required this.status,
   });
 
-  /// Traduce el tipo de servicio al español si viene en inglés desde Hotel-Project.
   String get _serviceLabel => switch (serviceType.toLowerCase()) {
         'cleaning' => 'Limpieza',
         'maintenance' => 'Mantenimiento',
@@ -34,32 +28,18 @@ class TaskCard extends StatelessWidget {
         _ => serviceType,
       };
 
-  /// Color principal según el tipo de servicio.
-  Color get _serviceColor {
-    switch (serviceType.toLowerCase()) {
-      case 'limpieza':
-      case 'cleaning':
-        return const Color(0xFF3B82F6); // Azul
-      case 'mantenimiento':
-      case 'maintenance':
-        return const Color(0xFFFF661A); // Naranja (marca)
-      case 'inspección':
-      case 'inspection':
-        return const Color(0xFF8B5CF6); // Violeta
-      case 'entrega':
-      case 'delivery':
-        return const Color(0xFF10B981); // Verde esmeralda
-      case 'sol. huésped':
-      case 'guest_request':
-        return const Color(0xFFF59E0B); // Ámbar
-      case 'room service':
-        return const Color(0xFF10B981); // Verde esmeralda
-      default:
-        return const Color(0xFF6B7280); // Gris
-    }
+  Color _serviceColor(BuildContext context) {
+    final statusColors = AppStatusColors.of(context);
+    return switch (serviceType.toLowerCase()) {
+      'limpieza' || 'cleaning' => statusColors.info,
+      'mantenimiento' || 'maintenance' => AppColors.primary,
+      'inspección' || 'inspection' => statusColors.purple,
+      'entrega' || 'delivery' || 'room service' => statusColors.success,
+      'sol. huésped' || 'guest_request' => statusColors.warning,
+      _ => statusColors.neutral,
+    };
   }
 
-  /// Icono según el tipo de servicio.
   IconData get _serviceIcon {
     switch (serviceType.toLowerCase()) {
       case 'limpieza':
@@ -86,110 +66,82 @@ class TaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E2030),
-        borderRadius: BorderRadius.circular(12),
-        border: Border(
-          left: BorderSide(color: _serviceColor, width: 4),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final color = _serviceColor(context);
+
+    return AppCard(
+      accent: color,
+      surfaceColor: AppColors.cardDark,
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
+      padding: const EdgeInsets.all(AppSpacing.md + 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppIconBadge(
+                icon: _serviceIcon,
+                color: color,
+                size: 36,
+                iconSize: AppIconSize.sm,
+              ),
+              const SizedBox(width: AppSpacing.sm + 2),
+              Expanded(
+                child: Text(
+                  _serviceLabel,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Text(
+                timeLabel,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm + 2),
+          Row(
+            children: [
+              Icon(
+                Icons.person_rounded,
+                size: AppIconSize.xs,
+                color: cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: AppSpacing.xs + 2),
+              Expanded(
+                child: Text(
+                  assignedTo,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs + 2),
+          Row(
+            children: [
+              Icon(
+                Icons.door_front_door_rounded,
+                size: AppIconSize.xs,
+                color: cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: AppSpacing.xs + 2),
+              Text(
+                'Hab. $room',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Encabezado: Tipo de servicio + tiempo ──────────────────
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: _serviceColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    _serviceIcon,
-                    size: 18,
-                    color: _serviceColor,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _serviceLabel,
-                    style: TextStyle(
-                      color: _serviceColor,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                Text(
-                  timeLabel,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 10),
-
-            // ── Persona asignada ───────────────────────────────────────
-            Row(
-              children: [
-                Icon(
-                  Icons.person_outline_rounded,
-                  size: 16,
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    assignedTo,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 6),
-
-            // ── Habitación ─────────────────────────────────────────────
-            Row(
-              children: [
-                Icon(
-                  Icons.door_front_door_outlined,
-                  size: 16,
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Hab. $room',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

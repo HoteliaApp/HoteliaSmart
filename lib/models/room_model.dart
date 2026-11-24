@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hotel_smart_app/config/theme/app_theme.dart';
 
 enum RoomType {
   single,
@@ -140,11 +141,11 @@ class RoomModel {
   }
 
   Color get statusColor => switch (estado) {
-        RoomStatus.available => const Color(0xFF4CAF50),
-        RoomStatus.occupied => const Color(0xFFFF9800),
-        RoomStatus.reserved => const Color(0xFF2196F3),
-        RoomStatus.dirty => const Color(0xFFF44336),
-        RoomStatus.maintenance => const Color(0xFF9C27B0),
+        RoomStatus.available => AppColors.statusSuccessDark,
+        RoomStatus.occupied => AppColors.statusDangerDark,
+        RoomStatus.reserved => AppColors.statusInfoDark,
+        RoomStatus.dirty => AppColors.statusWarningDark,
+        RoomStatus.maintenance => AppColors.statusPurpleDark,
       };
 
   String get statusText => estado.label;
